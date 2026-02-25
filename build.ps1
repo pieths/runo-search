@@ -184,6 +184,12 @@ foreach ($f in $filesToPackage) {
 Compress-Archive -Path (Join-Path $distDir "*") -DestinationPath $zipPath -Force
 Write-Host "Distribution zip created: dist\$zipName" -ForegroundColor Green
 
+# Create SHA256 checksum file
+$zipHash = (Get-FileHash -Path $zipPath -Algorithm SHA256).Hash.ToLower()
+$sha256File = "$zipPath.sha256"
+Set-Content -Path $sha256File -Value "$zipHash *$zipName" -NoNewline
+Write-Host "SHA256 checksum file created: dist\$zipName.sha256" -ForegroundColor Green
+
 Write-Host ""
 Write-Host "================================================" -ForegroundColor Green
 Write-Host "  Build Complete!" -ForegroundColor Green
