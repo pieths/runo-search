@@ -3,6 +3,7 @@
 
 use std::cell::RefCell;
 
+use memchr::{memchr, memrchr, memchr_iter};
 use napi_derive::napi;
 use regex::bytes::Regex;
 
@@ -169,11 +170,7 @@ fn positions_to_line_results(
 
     for &pos in positions.iter() {
         // Count newlines from last_pos to pos (progressive line counting)
-        for i in last_pos..pos {
-            if bytes[i] == b'\n' {
-                current_line += 1;
-            }
-        }
+        current_line += memchr_iter(b'\n', &bytes[last_pos..pos]).count() as u32;
         last_pos = pos;
 
         if seen_lines.insert(current_line) {
@@ -194,13 +191,13 @@ fn positions_to_line_results(
 
 fn extract_line_text(bytes: &[u8], pos: usize) -> String {
     // Find line start (after previous \n, or start of file)
-    let line_start = match bytes[..pos].iter().rposition(|&b| b == b'\n') {
+    let line_start = match memrchr(b'\n', &bytes[..pos]) {
         Some(i) => i + 1,
         None => 0,
     };
 
     // Find line end (next \n, or end of file)
-    let line_end = match bytes[pos..].iter().position(|&b| b == b'\n') {
+    let line_end = match memchr(b'\n', &bytes[pos..]) {
         Some(i) => pos + i,
         None => bytes.len(),
     };
