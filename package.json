@@ -1,0 +1,26 @@
+{
+  "name": "runo-search",
+  "version": "0.1.0",
+  "description": "Native Node.js addon for fast regex-based file searching",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "napi": {
+    "name": "runo-search",
+    "triples": {
+      "defaults": false,
+      "additional": [
+        "x86_64-pc-windows-msvc"
+      ]
+    }
+  },
+  "scripts": {
+    "artifacts": "napi artifacts",
+    "build": "napi build --platform --release",
+    "prepublishOnly": "napi prepublish -t npm",
+    "version": "napi version"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^2.18.4"
+  },
+  "license": "MIT"
+}

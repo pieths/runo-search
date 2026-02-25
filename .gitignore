@@ -1,0 +1,8 @@
+node_local/
+rust_local/
+node_modules/
+target/
+dist/
+*.node
+rustup-init.exe
+.vscode/
