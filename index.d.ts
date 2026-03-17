@@ -7,6 +7,10 @@ export interface SearchLineResult {
   line: number
   text: string
 }
+export interface FileSearchResult {
+  filePath: string
+  lines: Array<SearchLineResult>
+}
 /**
  * Search a file for matches using AND semantics across regex patterns.
  * All patterns must match somewhere in the file for results to be returned.
@@ -21,3 +25,19 @@ export interface SearchLineResult {
  * Returns an array of `{line, text}` results, or an empty array on no match / error.
  */
 export declare function searchFile(filePath: string, patterns: Array<string>, unicode: boolean, includeLines: boolean): Array<SearchLineResult>
+/**
+ * Search multiple files for matches using AND semantics across regex patterns.
+ * All patterns must match somewhere in a file for that file's results to be returned.
+ * Only files with one or more matches are included in the output.
+ *
+ * - `file_paths`: Array of absolute file paths to search
+ * - `patterns`: Array of regex pattern strings (AND semantics)
+ * - `unicode`: If true, `.` matches full Unicode characters and `\w`/`\d`/`\s`
+ *   use Unicode classes. If false, raw byte mode for maximum performance.
+ * - `include_lines`: If true, each result includes the full line text.
+ *   If false, the `text` field is set to an empty string.
+ *
+ * Returns an array of `{file_path, lines}` results for files that matched,
+ * or an empty array on no match / error.
+ */
+export declare function searchFiles(filePaths: Array<string>, patterns: Array<string>, unicode: boolean, includeLines: boolean): Array<FileSearchResult>

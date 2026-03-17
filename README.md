@@ -18,6 +18,8 @@ MSVC Build Tools which are required for the Rust linker).
 
 ## API
 
+### searchFile
+
 ```typescript
 export function searchFile(
     filePath: string,
@@ -33,6 +35,20 @@ export function searchFile(
 - **includeLines**: `true` to include line text, `false` for line numbers only
 
 Returns an empty array on no matches, errors, or invalid patterns (never throws).
+
+### searchFiles
+
+```typescript
+export function searchFiles(
+    filePaths: Array<string>,
+    patterns: Array<string>,
+    unicode: boolean,
+    includeLines: boolean,
+): Array<{ filePath: string; lines: Array<{ line: number; text: string }> }>;
+```
+
+Batch version of `searchFile`. Compiles regexes once and searches all files in a
+single native call. Only files with one or more matches are included in the output.
 
 ## Prerequisites
 

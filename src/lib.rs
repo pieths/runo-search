@@ -29,6 +29,12 @@ pub struct SearchLineResult {
     pub text: String,
 }
 
+#[napi(object)]
+pub struct FileSearchResult {
+    pub file_path: String,
+    pub lines: Vec<SearchLineResult>,
+}
+
 // ============================================================================
 // Thread-local regex cache
 // ============================================================================
@@ -125,6 +131,79 @@ pub fn search_file(
             })
             .collect()
     })
+}
+
+/// Search multiple files for matches using AND semantics across regex patterns.
+/// All patterns must match somewhere in a file for that file's results to be returned.
+/// Only files with one or more matches are included in the output.
+///
+/// - `file_paths`: Array of absolute file paths to search
+/// - `patterns`: Array of regex pattern strings (AND semantics)
+/// - `unicode`: If true, `.` matches full Unicode characters and `\w`/`\d`/`\s`
+///   use Unicode classes. If false, raw byte mode for maximum performance.
+/// - `include_lines`: If true, each result includes the full line text.
+///   If false, the `text` field is set to an empty string.
+///
+/// Returns an array of `{file_path, lines}` results for files that matched,
+/// or an empty array on no match / error.
+#[napi]
+pub fn search_files(
+    file_paths: Vec<String>,
+    patterns: Vec<String>,
+    unicode: bool,
+    include_lines: bool,
+) -> Vec<FileSearchResult> {
+    if patterns.is_empty() || file_paths.is_empty() {
+        return Vec::new();
+    }
+
+    // Compile regexes once for the entire batch
+    let regexes: Result<Vec<Regex>, _> = patterns
+        .iter()
+        .map(|pattern| {
+            regex::bytes::RegexBuilder::new(pattern)
+                .case_insensitive(true)
+                .multi_line(true)
+                .unicode(unicode)
+                .build()
+        })
+        .collect();
+
+    let regexes = match regexes {
+        Ok(r) => r,
+        Err(_) => return Vec::new(),
+    };
+
+    let mut results = Vec::new();
+
+    for file_path in &file_paths {
+        let file = match std::fs::File::open(file_path) {
+            Ok(f) => f,
+            Err(_) => continue,
+        };
+
+        let mmap = match unsafe { memmap2::Mmap::map(&file) } {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+
+        let line_results = search_file_impl(&mmap, &regexes, include_lines);
+
+        if !line_results.is_empty() {
+            results.push(FileSearchResult {
+                file_path: file_path.clone(),
+                lines: line_results
+                    .into_iter()
+                    .map(|r| SearchLineResult {
+                        line: r.line,
+                        text: r.text,
+                    })
+                    .collect(),
+            });
+        }
+    }
+
+    results
 }
 
 // ============================================================================
