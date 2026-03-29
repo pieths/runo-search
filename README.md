@@ -26,6 +26,7 @@ export function searchFile(
     patterns: Array<string>,
     unicode: boolean,
     includeLines: boolean,
+    caseInsensitive: boolean,
 ): Array<{ line: number; text: string }>;
 ```
 
@@ -33,6 +34,7 @@ export function searchFile(
 - **patterns**: Array of regex pattern strings (AND semantics — all must match)
 - **unicode**: `false` for raw byte mode (fast), `true` for Unicode-aware matching
 - **includeLines**: `true` to include line text, `false` for line numbers only
+- **caseInsensitive**: `true` for case-insensitive matching, `false` for case-sensitive
 
 Returns an empty array on no matches, errors, or invalid patterns (never throws).
 
@@ -44,6 +46,7 @@ export function searchFiles(
     patterns: Array<string>,
     unicode: boolean,
     includeLines: boolean,
+    caseInsensitive: boolean,
 ): Array<{ filePath: string; lines: Array<{ line: number; text: string }> }>;
 ```
 

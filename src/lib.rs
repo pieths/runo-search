@@ -56,6 +56,7 @@ thread_local! {
 ///   use Unicode classes. If false, raw byte mode for maximum performance.
 /// - `include_lines`: If true, each result includes the full line text.
 ///   If false, the `text` field is set to an empty string.
+/// - `case_insensitive`: If true, matching is case-insensitive.
 ///
 /// Returns an array of `{line, text}` results, or an empty array on no match / error.
 #[napi]
@@ -64,6 +65,7 @@ pub fn search_file(
     patterns: Vec<String>,
     unicode: bool,
     include_lines: bool,
+    case_insensitive: bool,
 ) -> Vec<SearchLineResult> {
     if patterns.is_empty() {
         return Vec::new();
@@ -75,6 +77,7 @@ pub fn search_file(
     let mut cache_key = patterns.join("\0");
     cache_key.push('\0');
     cache_key.push(if unicode { '1' } else { '0' });
+    cache_key.push(if case_insensitive { '1' } else { '0' });
 
     // 2. Get or compile regexes (thread-local cache)
     CACHED.with(|cell| {
@@ -87,7 +90,7 @@ pub fn search_file(
                     .iter()
                     .map(|pattern| {
                         regex::bytes::RegexBuilder::new(pattern)
-                            .case_insensitive(true)
+                            .case_insensitive(case_insensitive)
                             .multi_line(true)
                             .unicode(unicode)
                             .build()
@@ -143,6 +146,7 @@ pub fn search_file(
 ///   use Unicode classes. If false, raw byte mode for maximum performance.
 /// - `include_lines`: If true, each result includes the full line text.
 ///   If false, the `text` field is set to an empty string.
+/// - `case_insensitive`: If true, matching is case-insensitive.
 ///
 /// Returns an array of `{file_path, lines}` results for files that matched,
 /// or an empty array on no match / error.
@@ -152,6 +156,7 @@ pub fn search_files(
     patterns: Vec<String>,
     unicode: bool,
     include_lines: bool,
+    case_insensitive: bool,
 ) -> Vec<FileSearchResult> {
     if patterns.is_empty() || file_paths.is_empty() {
         return Vec::new();
@@ -162,7 +167,7 @@ pub fn search_files(
         .iter()
         .map(|pattern| {
             regex::bytes::RegexBuilder::new(pattern)
-                .case_insensitive(true)
+                .case_insensitive(case_insensitive)
                 .multi_line(true)
                 .unicode(unicode)
                 .build()

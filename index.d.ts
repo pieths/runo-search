@@ -21,10 +21,11 @@ export interface FileSearchResult {
  *   use Unicode classes. If false, raw byte mode for maximum performance.
  * - `include_lines`: If true, each result includes the full line text.
  *   If false, the `text` field is set to an empty string.
+ * - `case_insensitive`: If true, matching is case-insensitive.
  *
  * Returns an array of `{line, text}` results, or an empty array on no match / error.
  */
-export declare function searchFile(filePath: string, patterns: Array<string>, unicode: boolean, includeLines: boolean): Array<SearchLineResult>
+export declare function searchFile(filePath: string, patterns: Array<string>, unicode: boolean, includeLines: boolean, caseInsensitive: boolean): Array<SearchLineResult>
 /**
  * Search multiple files for matches using AND semantics across regex patterns.
  * All patterns must match somewhere in a file for that file's results to be returned.
@@ -36,8 +37,9 @@ export declare function searchFile(filePath: string, patterns: Array<string>, un
  *   use Unicode classes. If false, raw byte mode for maximum performance.
  * - `include_lines`: If true, each result includes the full line text.
  *   If false, the `text` field is set to an empty string.
+ * - `case_insensitive`: If true, matching is case-insensitive.
  *
  * Returns an array of `{file_path, lines}` results for files that matched,
  * or an empty array on no match / error.
  */
-export declare function searchFiles(filePaths: Array<string>, patterns: Array<string>, unicode: boolean, includeLines: boolean): Array<FileSearchResult>
+export declare function searchFiles(filePaths: Array<string>, patterns: Array<string>, unicode: boolean, includeLines: boolean, caseInsensitive: boolean): Array<FileSearchResult>
