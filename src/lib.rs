@@ -3,7 +3,7 @@
 
 use std::cell::RefCell;
 
-use memchr::{memchr, memrchr, memchr_iter};
+use memchr::memchr_iter;
 use napi_derive::napi;
 use regex::bytes::Regex;
 
@@ -16,23 +16,6 @@ struct CachedSearch {
     /// plus \0 + "1" or "0" for the unicode flag.
     cache_key: String,
     regexes: Vec<Regex>,
-}
-
-struct LineResult {
-    line: u32,
-    text: String,
-}
-
-#[napi(object)]
-pub struct SearchLineResult {
-    pub line: u32,
-    pub text: String,
-}
-
-#[napi(object)]
-pub struct FileSearchResult {
-    pub file_path: String,
-    pub lines: Vec<SearchLineResult>,
 }
 
 #[napi(object)]
@@ -74,32 +57,28 @@ thread_local! {
 /// - `patterns`: Array of regex pattern strings (AND semantics)
 /// - `unicode`: If true, `.` matches full Unicode characters and `\w`/`\d`/`\s`
 ///   use Unicode classes. If false, raw byte mode for maximum performance.
-/// - `include_lines`: If true, each result includes the full line text.
-///   If false, the `text` field is set to an empty string.
 /// - `case_insensitive`: If true, matching is case-insensitive.
 ///
-/// Returns an array of `{line, text}` results, or an empty array on no match / error.
+/// Returns a single-element array with match data, or an empty array on
+/// no match / error.
 #[napi]
-pub fn search_file(
+pub fn search_file_and(
     file_path: String,
     patterns: Vec<String>,
     unicode: bool,
-    include_lines: bool,
     case_insensitive: bool,
-) -> Vec<SearchLineResult> {
+) -> Vec<FilePatternMatches> {
     if patterns.is_empty() {
         return Vec::new();
     }
 
-    // 1. Build cache key from patterns + unicode flag.
-    //    include_lines is NOT part of the cache key — it doesn't affect
-    //    regex compilation, only output formatting.
+    // Build cache key from patterns + unicode flag.
     let mut cache_key = patterns.join("\0");
     cache_key.push('\0');
     cache_key.push(if unicode { '1' } else { '0' });
     cache_key.push(if case_insensitive { '1' } else { '0' });
 
-    // 2. Get or compile regexes (thread-local cache)
+    // Get or compile regexes (thread-local cache)
     CACHED.with(|cell| {
         let mut cache = cell.borrow_mut();
 
@@ -131,7 +110,7 @@ pub fn search_file(
             }
         };
 
-        // 3. Open and mmap the file
+        // Open and mmap the file
         let file = match std::fs::File::open(&file_path) {
             Ok(f) => f,
             Err(_) => return Vec::new(),
@@ -142,17 +121,34 @@ pub fn search_file(
             Err(_) => return Vec::new(),
         };
 
-        // 4. Search
-        let results = search_file_impl(&mmap, regexes, include_lines);
+        let bytes = &mmap[..];
+        let mut pattern_matches = Vec::new();
 
-        // 5. Convert to napi return type
-        results
-            .into_iter()
-            .map(|r| SearchLineResult {
-                line: r.line,
-                text: r.text,
-            })
-            .collect()
+        for (idx, regex) in regexes.iter().enumerate() {
+            let match_positions: Vec<usize> =
+                regex.find_iter(bytes).map(|m| m.start()).collect();
+
+            if match_positions.is_empty() {
+                return Vec::new(); // AND failed — early exit
+            }
+
+            let frequency = match_positions.len() as u32;
+            let line_numbers = positions_to_line_numbers(bytes, &match_positions);
+
+            pattern_matches.push(PatternMatch {
+                pattern_index: idx as u32,
+                frequency,
+                line_numbers,
+            });
+        }
+
+        let total_lines = memchr_iter(b'\n', bytes).count() as u32 + 1;
+
+        vec![FilePatternMatches {
+            file_path,
+            total_lines,
+            patterns: pattern_matches,
+        }]
     })
 }
 
@@ -164,20 +160,17 @@ pub fn search_file(
 /// - `patterns`: Array of regex pattern strings (AND semantics)
 /// - `unicode`: If true, `.` matches full Unicode characters and `\w`/`\d`/`\s`
 ///   use Unicode classes. If false, raw byte mode for maximum performance.
-/// - `include_lines`: If true, each result includes the full line text.
-///   If false, the `text` field is set to an empty string.
 /// - `case_insensitive`: If true, matching is case-insensitive.
 ///
-/// Returns an array of `{file_path, lines}` results for files that matched,
+/// Returns an array of `FilePatternMatches` for files where all patterns matched,
 /// or an empty array on no match / error.
 #[napi]
-pub fn search_files(
+pub fn search_files_and(
     file_paths: Vec<String>,
     patterns: Vec<String>,
     unicode: bool,
-    include_lines: bool,
     case_insensitive: bool,
-) -> Vec<FileSearchResult> {
+) -> Vec<FilePatternMatches> {
     if patterns.is_empty() || file_paths.is_empty() {
         return Vec::new();
     }
@@ -212,18 +205,35 @@ pub fn search_files(
             Err(_) => continue,
         };
 
-        let line_results = search_file_impl(&mmap, &regexes, include_lines);
+        let bytes = &mmap[..];
+        let mut pattern_matches = Vec::new();
+        let mut all_matched = true;
 
-        if !line_results.is_empty() {
-            results.push(FileSearchResult {
+        for (idx, regex) in regexes.iter().enumerate() {
+            let match_positions: Vec<usize> =
+                regex.find_iter(bytes).map(|m| m.start()).collect();
+
+            if match_positions.is_empty() {
+                all_matched = false;
+                break; // AND failed — early exit
+            }
+
+            let frequency = match_positions.len() as u32;
+            let line_numbers = positions_to_line_numbers(bytes, &match_positions);
+
+            pattern_matches.push(PatternMatch {
+                pattern_index: idx as u32,
+                frequency,
+                line_numbers,
+            });
+        }
+
+        if all_matched {
+            let total_lines = memchr_iter(b'\n', bytes).count() as u32 + 1;
+            results.push(FilePatternMatches {
                 file_path: file_path.clone(),
-                lines: line_results
-                    .into_iter()
-                    .map(|r| SearchLineResult {
-                        line: r.line,
-                        text: r.text,
-                    })
-                    .collect(),
+                total_lines,
+                patterns: pattern_matches,
             });
         }
     }
@@ -319,69 +329,10 @@ pub fn search_files_or(
 }
 
 // ============================================================================
-// Core search logic
+// Line number calculation
 // ============================================================================
-
-/// Sequential regex matching with AND semantics and early exit.
-fn search_file_impl(bytes: &[u8], regexes: &[Regex], include_lines: bool) -> Vec<LineResult> {
-    let mut all_match_positions: Vec<usize> = Vec::new();
-
-    for regex in regexes {
-        let matches: Vec<usize> = regex.find_iter(bytes).map(|m| m.start()).collect();
-
-        if matches.is_empty() {
-            return Vec::new(); // AND failed — early exit
-        }
-
-        all_match_positions.extend(matches);
-    }
-
-    // Convert byte positions to line numbers + optionally extract line text
-    // Deduplicate by line number, sort by line number
-    positions_to_line_results(bytes, &mut all_match_positions, include_lines)
-}
-
-// ============================================================================
-// Line number calculation and text extraction
-// ============================================================================
-
-fn positions_to_line_results(
-    bytes: &[u8],
-    positions: &mut Vec<usize>,
-    include_lines: bool,
-) -> Vec<LineResult> {
-    // Sort positions so we can do a single forward pass for line counting
-    positions.sort_unstable();
-    positions.dedup();
-
-    let mut results = Vec::new();
-    let mut seen_lines = std::collections::HashSet::new();
-    let mut current_line: u32 = 1;
-    let mut last_pos: usize = 0;
-
-    for &pos in positions.iter() {
-        // Count newlines from last_pos to pos (progressive line counting)
-        current_line += memchr_iter(b'\n', &bytes[last_pos..pos]).count() as u32;
-        last_pos = pos;
-
-        if seen_lines.insert(current_line) {
-            let text = if include_lines {
-                extract_line_text(bytes, pos)
-            } else {
-                String::new()
-            };
-            results.push(LineResult {
-                line: current_line,
-                text,
-            });
-        }
-    }
-
-    results
-}
 
 /// Convert byte positions to deduplicated, sorted 1-based line numbers.
-/// Used by search_files_or where line text is not needed.
 fn positions_to_line_numbers(bytes: &[u8], positions: &[usize]) -> Vec<u32> {
     let mut sorted_positions = positions.to_vec();
     sorted_positions.sort_unstable();
@@ -400,24 +351,4 @@ fn positions_to_line_numbers(bytes: &[u8], positions: &[usize]) -> Vec<u32> {
     }
 
     line_numbers
-}
-
-fn extract_line_text(bytes: &[u8], pos: usize) -> String {
-    // Find line start (after previous \n, or start of file)
-    let line_start = match memrchr(b'\n', &bytes[..pos]) {
-        Some(i) => i + 1,
-        None => 0,
-    };
-
-    // Find line end (next \n, or end of file)
-    let line_end = match memchr(b'\n', &bytes[pos..]) {
-        Some(i) => pos + i,
-        None => bytes.len(),
-    };
-
-    // Extract line, strip trailing \r (Windows line endings)
-    let line_bytes = &bytes[line_start..line_end];
-    let text = String::from_utf8_lossy(line_bytes);
-    let text = text.trim_end_matches(|c| c == '\r' || c == '\n');
-    text.to_string()
 }

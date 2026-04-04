@@ -16,7 +16,7 @@
 // in the file for any results to be returned.
 // ============================================================================
 
-const { searchFile } = require("./index");
+const { searchFileAnd } = require("./index");
 
 const args = process.argv.slice(2);
 
@@ -32,13 +32,15 @@ console.log(`File:     ${filePath}`);
 console.log(`Patterns: ${patterns.join(", ")}`);
 console.log();
 
-const results = searchFile(filePath, patterns, /* unicode */ false, /* includeLines */ true);
+const results = searchFileAnd(filePath, patterns, /* unicode */ false, /* caseInsensitive */ false);
 
 if (results.length === 0) {
     console.log("No matches found.");
 } else {
-    console.log(`Found ${results.length} matching line(s):\n`);
-    for (const { line, text } of results) {
-        console.log(`  ${line}: ${text}`);
+    const file = results[0];
+    console.log(`Total lines: ${file.totalLines}`);
+    console.log(`Patterns matched: ${file.patterns.length}\n`);
+    for (const p of file.patterns) {
+        console.log(`  Pattern ${p.patternIndex}: ${p.frequency} match(es) on lines ${p.lineNumbers.join(", ")}`);
     }
 }

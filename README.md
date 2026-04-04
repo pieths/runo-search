@@ -18,40 +18,54 @@ MSVC Build Tools which are required for the Rust linker).
 
 ## API
 
-### searchFile
+### searchFileAnd
 
 ```typescript
-export function searchFile(
+export function searchFileAnd(
     filePath: string,
     patterns: Array<string>,
     unicode: boolean,
-    includeLines: boolean,
     caseInsensitive: boolean,
-): Array<{ line: number; text: string }>;
+): Array<{
+    filePath: string;
+    totalLines: number;
+    patterns: Array<{
+        patternIndex: number;
+        frequency: number;
+        lineNumbers: Array<number>;
+    }>;
+}>;
 ```
 
 - **filePath**: Absolute path to the file to search
 - **patterns**: Array of regex pattern strings (AND semantics — all must match)
 - **unicode**: `false` for raw byte mode (fast), `true` for Unicode-aware matching
-- **includeLines**: `true` to include line text, `false` for line numbers only
 - **caseInsensitive**: `true` for case-insensitive matching, `false` for case-sensitive
 
-Returns an empty array on no matches, errors, or invalid patterns (never throws).
+Returns a single-element array with per-pattern match data, or an empty array on
+no matches, errors, or invalid patterns (never throws).
 
-### searchFiles
+### searchFilesAnd
 
 ```typescript
-export function searchFiles(
+export function searchFilesAnd(
     filePaths: Array<string>,
     patterns: Array<string>,
     unicode: boolean,
-    includeLines: boolean,
     caseInsensitive: boolean,
-): Array<{ filePath: string; lines: Array<{ line: number; text: string }> }>;
+): Array<{
+    filePath: string;
+    totalLines: number;
+    patterns: Array<{
+        patternIndex: number;
+        frequency: number;
+        lineNumbers: Array<number>;
+    }>;
+}>;
 ```
 
-Batch version of `searchFile`. Compiles regexes once and searches all files in a
-single native call. Only files with one or more matches are included in the output.
+Batch version of `searchFileAnd`. Compiles regexes once and searches all files in a
+single native call. Only files where all patterns matched are included in the output.
 
 ### searchFilesOr
 
@@ -75,7 +89,9 @@ export function searchFilesOr(
 OR-based batch search with match statistics. Each pattern is evaluated
 independently per file — a file only needs to match one pattern to be included.
 Returns per-pattern frequency and deduplicated line numbers, plus the total line
-count for document length normalization. No line text is returned.
+count for document length normalization.
+
+All three methods return the same output shape.
 
 ## Prerequisites
 
