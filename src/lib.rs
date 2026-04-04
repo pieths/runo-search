@@ -294,9 +294,6 @@ pub fn search_files_or(
 
         let bytes = &mmap[..];
 
-        // Count total lines: number of newlines + 1
-        let total_lines = memchr_iter(b'\n', bytes).count() as u32 + 1;
-
         let mut pattern_matches = Vec::new();
 
         for (idx, regex) in regexes.iter().enumerate() {
@@ -317,6 +314,7 @@ pub fn search_files_or(
         }
 
         if !pattern_matches.is_empty() {
+            let total_lines = memchr_iter(b'\n', bytes).count() as u32 + 1;
             results.push(FilePatternMatches {
                 file_path: file_path.clone(),
                 total_lines,
