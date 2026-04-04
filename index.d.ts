@@ -11,6 +11,22 @@ export interface FileSearchResult {
   filePath: string
   lines: Array<SearchLineResult>
 }
+export interface PatternMatch {
+  /** Index into the input patterns array (0-based) */
+  patternIndex: number
+  /** Number of matches for this pattern in the file */
+  frequency: number
+  /** 1-based line numbers where this pattern matched (deduplicated, sorted) */
+  lineNumbers: Array<number>
+}
+export interface FilePatternMatches {
+  /** Absolute file path */
+  filePath: string
+  /** Total number of lines in the file */
+  totalLines: number
+  /** Per-pattern match data. Only patterns with >= 1 match are included. */
+  patterns: Array<PatternMatch>
+}
 /**
  * Search a file for matches using AND semantics across regex patterns.
  * All patterns must match somewhere in the file for results to be returned.
@@ -43,3 +59,16 @@ export declare function searchFile(filePath: string, patterns: Array<string>, un
  * or an empty array on no match / error.
  */
 export declare function searchFiles(filePaths: Array<string>, patterns: Array<string>, unicode: boolean, includeLines: boolean, caseInsensitive: boolean): Array<FileSearchResult>
+/**
+ * Search multiple files for matches using OR semantics across regex patterns.
+ * Each pattern is evaluated independently per file. Returns per-pattern
+ * frequency and line number data.
+ *
+ * - `file_paths`: Array of absolute file paths to search
+ * - `patterns`: Array of regex pattern strings (each searched independently)
+ * - `unicode`: If true, use Unicode character classes. False for performance.
+ * - `case_insensitive`: If true, matching is case-insensitive.
+ *
+ * Returns an array of `FilePatternMatches` for files with at least one pattern match.
+ */
+export declare function searchFilesOr(filePaths: Array<string>, patterns: Array<string>, unicode: boolean, caseInsensitive: boolean): Array<FilePatternMatches>

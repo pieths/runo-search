@@ -53,6 +53,30 @@ export function searchFiles(
 Batch version of `searchFile`. Compiles regexes once and searches all files in a
 single native call. Only files with one or more matches are included in the output.
 
+### searchFilesOr
+
+```typescript
+export function searchFilesOr(
+    filePaths: Array<string>,
+    patterns: Array<string>,
+    unicode: boolean,
+    caseInsensitive: boolean,
+): Array<{
+    filePath: string;
+    totalLines: number;
+    patterns: Array<{
+        patternIndex: number;
+        frequency: number;
+        lineNumbers: Array<number>;
+    }>;
+}>;
+```
+
+OR-based batch search with match statistics. Each pattern is evaluated
+independently per file — a file only needs to match one pattern to be included.
+Returns per-pattern frequency and deduplicated line numbers, plus the total line
+count for document length normalization. No line text is returned.
+
 ## Prerequisites
 
 - **MSVC C++ Build Tools** (Visual Studio or VS Build Tools)

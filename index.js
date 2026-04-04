@@ -310,7 +310,8 @@ if (!nativeBinding) {
   throw new Error(`Failed to load native binding`)
 }
 
-const { searchFile, searchFiles } = nativeBinding
+const { searchFile, searchFiles, searchFilesOr } = nativeBinding
 
 module.exports.searchFile = searchFile
 module.exports.searchFiles = searchFiles
+module.exports.searchFilesOr = searchFilesOr
